@@ -2,14 +2,14 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\LogsController;
+use App\Http\Controllers\ServiceController;
 use App\Models\Campus;
-use App\Models\Service;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 
 Route::get('/campuses', fn() => Campus::orderBy('name')->get());
-Route::get('/services', fn() => Service::where('active', true)->orderBy('name')->get());
+Route::get('/campuses/{campus}/services', [ServiceController::class, 'index']);
 
 
 Route::post('/signup', [AuthController::class, 'signup']);

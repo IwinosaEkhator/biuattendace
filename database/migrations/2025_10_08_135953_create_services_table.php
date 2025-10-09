@@ -12,11 +12,14 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('services', function (Blueprint $table) {
-            $table->id();                    // BIGINT UNSIGNED
-            $table->string('slug')->unique(); // e.g., sunday, cfi, chapel, cell
+            $table->id();
+            $table->foreignId('campus_id')->constrained('campuses')->cascadeOnDelete();
+            $table->string('slug');
             $table->string('name');
             $table->boolean('active')->default(true);
             $table->timestamps();
+
+            $table->unique(['campus_id', 'slug']);
         });
     }
 
