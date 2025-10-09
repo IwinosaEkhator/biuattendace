@@ -14,7 +14,6 @@ Route::get('/services', fn() => Service::where('active', true)->orderBy('name')-
 
 Route::post('/signup', [AuthController::class, 'signup']);
 Route::post('/signin', [AuthController::class, 'signin'])->middleware('throttle:5,1');
-Route::post('/signout', [AuthController::class, 'signout']);
 // Other routes...
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/logs', [LogsController::class, 'index']);
@@ -24,4 +23,6 @@ Route::middleware('auth:sanctum')->group(function () {
 
 
     Route::get('/user', fn(Request $request) => $request->user()->load('campus'));
+
+    Route::post('/signout', [AuthController::class, 'signout']);
 });
