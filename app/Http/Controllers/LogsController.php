@@ -4,10 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\Logs;
 use App\Http\Controllers\Controller;
+use App\Models\Service;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\DB;
 
 class LogsController extends Controller implements HasMiddleware
 {
@@ -24,7 +26,7 @@ class LogsController extends Controller implements HasMiddleware
      */
     public function index()
     {
-        return Logs::with('user')->latest()->get();
+        return \App\Models\Logs::with(['user', 'campus', 'service'])->latest()->get();
     }
 
     /**
@@ -32,18 +34,33 @@ class LogsController extends Controller implements HasMiddleware
      */
     public function store(Request $request)
     {
-        // Validate incoming request data
-        $fields = $request->validate([
-            'log' => 'required|string|max:255'
+        // New preferred shape
+        $validated = $request->validate([
+            'mat_no'       => 'nullable|string|max:50',
+            'service_slug' => 'nullable|string|exists:services,slug',
+            'log'          => 'nullable|string|max:255', // legacy support
         ]);
 
-        // Create the log and associate it with the authenticated user
-        $log = $request->user()->log()->create($fields);
+        // Backward compatibility: if only "log" was sent, treat it as mat_no
+        $matNo = $validated['mat_no'] ?? $validated['log'] ?? null;
+        if (!$matNo) {
+            return response()->json(['message' => 'mat_no is required'], 422);
+        }
 
-        // Return response with the created log and associated user
+        $service = Service::where('slug', $validated['service_slug'])->firstOrFail();
+        if (!$service->active) return response()->json(['message' => 'Service inactive'], 403);
+
+        $campusId = $request->user()->campus_id; // ✅ campus from the logged-in user
+
+        $log = $request->user()->log()->create([
+            'log'        => $request->input('log', $matNo),
+            'mat_no'     => $matNo,
+            'campus_id'  => $campusId,
+            'service_id' => $service->id,
+        ]);
+
         return response()->json([
-            'log' => $log,
-            'user' => $log->user,
+            'log' => $log->load(['user', 'campus', 'service']),
             'message' => 'Log saved successfully'
         ], 201);
     }
@@ -53,57 +70,30 @@ class LogsController extends Controller implements HasMiddleware
      */
     public function show($id)
     {
-        // Find a DeliveryRequest by its ID, including the associated user
-        $logs = Logs::with('user')->find($id);
-
-        // If the request is not found, return a 404 error
-        if (!$logs) {
-            return response()->json(['message' => 'Log not found'], 404);
-        }
-
+        $logs = \App\Models\Logs::with(['user', 'campus', 'service'])->find($id);
+        if (!$logs) return response()->json(['message' => 'Log not found'], 404);
         return response()->json($logs);
     }
-
     /**
-     * Update the specified resource in storage.
+     * Remove all logs from storage.
      */
-    // public function update(Request $request, $id)
-    // {
-    //     $fields = $request->validate([
-    //         'log' => 'required|max:255',
-    //     ]);
-
-    //     // Find the existing delivery request by ID
-    //     $logs = Logs::find($id);
-
-    //     // Check if the delivery request exists
-    //     if (!$logs) {
-    //         return response()->json(['message' => 'Delivery request not found'], 404);
-    //     }
-
-    //     // Update the status field
-    //     $logs->status = $fields['status'];
-
-    //     // Save the updated delivery request
-    //     if ($logs->save()) {
-    //         return response()->json([
-    //             'message' => 'Status updated successfully',
-    //             'deliveryRequest' => $logs,
-    //         ], 200);
-    //     } else {
-    //         return response()->json(['message' => 'Failed to update status'], 500);
-    //     }
-    // }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(Logs $logs)
+    public function destroy()
     {
-        Gate::authorize('modify', $logs);
+        // Check if the user is authorized to delete all logs
+        // if (!Gate::allows('delete-logs')) {
+        //     return response()->json(['message' => 'Unauthorized'], 403);
+        // }
 
-        $logs->delete();
+        try {
+            // Temporarily disable foreign key checks to allow truncating the table
+            DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+            Logs::truncate();
+            DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
-        return ['message' => 'The request was deleted'];
+            return response()->json(['message' => 'All logs deleted successfully'], 200);
+        } catch (\Exception $e) {
+            // Log the exception for debugging if needed
+            return response()->json(['message' => 'Failed to delete all logs', 'error' => $e->getMessage()], 500);
+        }
     }
 }

@@ -2,6 +2,10 @@
 
 namespace App\Providers;
 
+use App\Models\DeliveryRequest;
+use App\Models\Logs;
+use App\Policies\DeliveryRequestPolicy;
+use App\Policies\LogPolicy;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -21,4 +25,8 @@ class AppServiceProvider extends ServiceProvider
     {
         //
     }
+
+    protected $policies = [
+        Logs::class => LogPolicy::class,
+    ];
 }

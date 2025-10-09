@@ -2,16 +2,26 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\LogsController;
+use App\Models\Campus;
+use App\Models\Service;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/user', function (Request $request) {
-    return $request->user();
-})->middleware('auth:sanctum');
+
+Route::get('/campuses', fn() => Campus::orderBy('name')->get());
+Route::get('/services', fn() => Service::where('active', true)->orderBy('name')->get());
+
 
 Route::post('/signup', [AuthController::class, 'signup']);
-Route::post('/signin', [AuthController::class, 'signin']);
+Route::post('/signin', [AuthController::class, 'signin'])->middleware('throttle:5,1');
 Route::post('/signout', [AuthController::class, 'signout']);
+// Other routes...
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/logs', [LogsController::class, 'index']);
+    Route::get('/logs/{id}', [LogsController::class, 'show']);
+    Route::post('/logs', [LogsController::class, 'store']);
+    Route::delete('/logs', [LogsController::class, 'destroy']);
 
-Route::post('/logs', [LogsController::class, 'store']);
-Route::get('/logs', [LogsController::class, 'index']);
+
+    Route::get('/user', fn(Request $request) => $request->user()->load('campus'));
+});

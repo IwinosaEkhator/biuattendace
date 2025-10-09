@@ -22,6 +22,8 @@ class User extends Authenticatable
         'username',
         'mat_no',
         'password',
+        'campus_id',
+        'user_type'
     ];
 
     /**
@@ -47,7 +49,18 @@ class User extends Authenticatable
         ];
     }
 
-    public function log(){
+    public function log()
+    {
         return $this->hasMany(Logs::class);
+    }
+
+    public function isAdmin()
+    {
+        return $this->user_type === 'admin'; // Adjust based on your `user_type` field
+    }
+
+    public function campus()
+    {
+        return $this->belongsTo(Campus::class);
     }
 }
