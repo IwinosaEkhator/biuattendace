@@ -19,7 +19,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/logs', [LogsController::class, 'index']);
     Route::get('/logs/{id}', [LogsController::class, 'show']);
     Route::post('/logs', [LogsController::class, 'store']);
-    Route::delete('/logs', [LogsController::class, 'destroy']);
+    Route::delete('/logs', [LogsController::class, 'destroyByDate'])
+        ->middleware('auth:sanctum');
 
 
     Route::get('/user', fn(Request $request) => $request->user()->load('campus'));

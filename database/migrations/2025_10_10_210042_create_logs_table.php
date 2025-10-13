@@ -13,14 +13,20 @@ return new class extends Migration
     {
         Schema::create('logs', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('user_id');
+
+            // Foreign keys
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('service_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('campus_id')->constrained()->cascadeOnDelete();
+
+            // Log message / action details
             $table->string('log', 255);
+            $table->string('mat_no', 50)->nullable();
             $table->timestamps();
 
-            // Foreign key constraint
-            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
+            // Optional: prevent same user from logging same service twice at same time
+            // $table->unique(['user_id', 'service_id', 'campus_id', 'created_at']);
         });
-
     }
 
     /**
