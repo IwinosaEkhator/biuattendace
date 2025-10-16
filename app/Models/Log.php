@@ -9,7 +9,28 @@ use Illuminate\Database\Eloquent\Model;
 class Log extends Model
 {
     use HasFactory;
-    protected $fillable = ['user_id', 'service_id', 'campus_id', 'log', 'mat_no'];
+    // protected $guarded = [];
+    // protected $fillable = ['user_id', 'service_id', 'campus_id', 'log', 'mat_no'];
+
+    protected $fillable = [
+        'client_id',
+        'user_id',
+        'service_id',
+        'campus_id',
+        'log',
+        'mat_no',
+        'scanned_at',
+        'lat',
+        'lng',
+        'meta',
+    ];
+
+    protected $casts = [
+        'meta'       => 'array',
+        'scanned_at' => 'datetime',
+        'lat'        => 'float',
+        'lng'        => 'float',
+    ];
 
     protected static function booted()
     {
