@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Log;
 use App\Models\Service;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\DB;
@@ -11,6 +12,7 @@ use Illuminate\Support\Facades\Log as SysLog;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Validator;
 
 class LogsController extends Controller implements HasMiddleware
 {
@@ -133,6 +135,98 @@ class LogsController extends Controller implements HasMiddleware
             ], 500);
         }
     }
+
+    public function batch(Request $request)
+    {
+        $user = $request->user();
+        $items = $request->input('items', []);
+        if (!is_array($items)) {
+            return response()->json(['message' => 'Invalid payload'], 422);
+        }
+
+        $results = [];
+
+        foreach ($items as $raw) {
+            $v = Validator::make($raw, [
+                'client_id'  => ['required', 'uuid'],
+                'mat_no'     => ['required', 'string', 'max:50'],
+                'service_id' => ['required', 'integer', 'exists:services,id'],
+                'campus_id'  => ['required', 'integer', 'exists:campuses,id'],
+                'scanned_at' => ['required', 'integer', 'min:0'],
+                'lat'        => ['nullable', 'numeric', 'between:-90,90'],
+                'lng'        => ['nullable', 'numeric', 'between:-180,180'],
+                'meta'       => ['nullable', 'array'],
+                'device'     => ['nullable', 'array'],
+            ]);
+
+            if ($v->fails()) {
+                $results[] = [
+                    'client_id' => $raw['client_id'] ?? null,
+                    'status'    => 'error',
+                    'error'     => $v->errors()->first(),
+                ];
+                continue;
+            }
+
+            // Authorization / scoping: non-admins can only write to their own campus
+            if (($user->user_type ?? null) !== 'admin' && (int)$raw['campus_id'] !== (int)$user->campus_id) {
+                $results[] = [
+                    'client_id' => $raw['client_id'],
+                    'status'    => 'error',
+                    'error'     => 'Forbidden campus scope',
+                ];
+                continue;
+            }
+
+            // Optional: ensure service belongs to campus
+            $svcCampusOk = DB::table('services')
+                ->where('id', (int)$raw['service_id'])
+                ->where('campus_id', (int)$raw['campus_id'])
+                ->exists();
+
+            if (!$svcCampusOk) {
+                $results[] = [
+                    'client_id' => $raw['client_id'],
+                    'status'    => 'error',
+                    'error'     => 'Service does not belong to campus',
+                ];
+                continue;
+            }
+
+            try {
+                $scannedAt = \Carbon\Carbon::createFromTimestampMs($raw['scanned_at'])->toDateTimeString();
+
+                \App\Models\Log::updateOrCreate(
+                    ['client_id' => $raw['client_id']],
+                    [
+                        'user_id'    => $user->id,
+                        'service_id' => (int)$raw['service_id'],
+                        'campus_id'  => (int)$raw['campus_id'],
+                        'log'        => strtoupper(trim($raw['mat_no'])), // or any message you prefer
+                        'mat_no'     => strtoupper(trim($raw['mat_no'])),
+                        'scanned_at' => $scannedAt,
+                        'lat'        => $raw['lat'] ?? null,
+                        'lng'        => $raw['lng'] ?? null,
+                        'meta'       => $raw['meta'] ?? [],
+                    ]
+                );
+
+                $results[] = [
+                    'client_id' => $raw['client_id'],
+                    'status'    => 'ok',
+                ];
+            } catch (\Throwable $e) {
+                $results[] = [
+                    'client_id' => $raw['client_id'],
+                    'status'    => 'error',
+                    'error'     => 'SERVER: ' . $e->getMessage(),
+                ];
+            }
+        }
+
+        return response()->json(['results' => $results]);
+    }
+
 
     public function show(Request $request, $id)
     {
