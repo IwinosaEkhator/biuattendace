@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('logs', function (Blueprint $table) {
             $table->id();
+            $table->uuid('client_id')->unique();
 
             // Foreign keys
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
@@ -23,6 +24,12 @@ return new class extends Migration
             $table->string('log', 255);
             $table->string('mat_no', 50)->nullable();
             $table->timestamps();
+            $table->timestamp('scanned_at');
+            $table->decimal('lat', 10, 6)->nullable();
+            $table->decimal('lng', 10, 6)->nullable();
+            $table->json('meta')->nullable();
+
+            $table->index(['mat_no', 'service_id', 'campus_id', 'scanned_at']);
 
             // Optional: prevent same user from logging same service twice at same time
             // $table->unique(['user_id', 'service_id', 'campus_id', 'created_at']);
