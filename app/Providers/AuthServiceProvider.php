@@ -12,10 +12,8 @@ class AuthServiceProvider extends ServiceProvider
     {
         $this->registerPolicies();
 
-        // Define the delete-logs gate
-        Gate::define('delete-logs', function (User $user) {
-            return $user->user_type === 'admin'; // Adjust condition based on your requirements
+        Gate::define('admin-only', function ($user) {
+            return ($user->user_type ?? 'user') === 'admin';
         });
     }
 }
-
